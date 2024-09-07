@@ -12,24 +12,35 @@ class bazaar_data:
         self.headers = request_data.headers
         
 class bazaar_updater:
-    def __init__(self) -> None:
+    def __init__(self, bazaar_url, listener_server, user_agent) -> None:
         self.request_session = requests.Session()
-        self.localCache = {"last-updated": {"last-updated-timestamp": None, "last-updated-string": None, "last-updated-data": None}}
-    
+        self.localCache = {
+            "last-updated": {
+                "timestamp": 0,
+                "timestring": "",
+                "data": {}
+            }
+        }
+        
+        self.bazaar_url = bazaar_url
+        self.listener_server = listener_server
+        self.user_agent = user_agent
+        
+
     def get_bazaar_data(self):
-        request_data = self.request_session.get('https://api.hypixel.net/skyblock/bazaar', headers={'User-Agent': 'Mozilla/5.0'})
+        request_data = self.request_session.get(self.bazaar_url, headers={'User-Agent': self.user_agent})
         return bazaar_data(request_data)
     
     def send_to_listener(self, data: bazaar_data):
         try:
-            self.request_session.post('http://localhost:8000/bazaar', json=data.json, timeout=0.5)
+            self.request_session.post(self.listener_server, json=data.json, timeout=0.5)
         except requests.exceptions.RequestException as e:
             print(e)
     
     def update_cache(self, data: bazaar_data):
-        self.localCache["last-updated"]["last-updated-timestamp"] = data.timestamp
-        self.localCache["last-updated"]["last-updated-string"] = data.last_updated
-        self.localCache["last-updated"]["last-updated-data"] = data.json
+        self.localCache["last-updated"]["timestamp"] = data.timestamp
+        self.localCache["last-updated"]["timestring"] = data.last_updated
+        self.localCache["last-updated"]["data"] = data.json
         
         print("Updated cache")
         
@@ -37,11 +48,11 @@ class bazaar_updater:
         while True:
             request_data = self.get_bazaar_data()
             if (type(request_data) == bazaar_data):
-                if self.localCache["last-updated"]["last-updated-timestamp"] != request_data.timestamp:
+                if self.localCache["last-updated"]["timestamp"] != request_data.timestamp:
                     self.send_to_listener(request_data)
                     self.update_cache(request_data)
                     
                     
-if __name__ == "__main__":
-    updater = bazaar_updater()
+def start_bazaar_client(bazaar_url, listener_server, user_agent):
+    updater = bazaar_updater(bazaar_url, listener_server, user_agent)
     updater.start()
